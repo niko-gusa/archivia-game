@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NextCloud - 同期済みフォルダ（阿部_バックアップ）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f4f4f0;
+    color: #1a1a1a;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ヘッダー */
+  #header {
+    height: 50px;
+    background: #fff;
+    border-bottom: 1px solid #dcdcdc;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    flex-shrink: 0;
+  }
+  .header-logo-img {
+    height: 24px;
+    width: auto;
+    object-fit: contain;
+    display: block;
+  }
+  .header-sub { font-size: 11px; color: #888; margin-left: 12px; }
+  .nav-tabs { display: flex; gap: 4px; margin-left: auto; height: 100%; align-items: center; }
+  .nav-tab {
+    padding: 6px 12px; font-size: 12px; font-weight: 600; color: #666;
+    background: none;
+    border: 1px solid transparent; border-radius: 4px; cursor: pointer;
+  }
+  .nav-tab:hover { background: #eee; color: #111; }
+  .nav-tab.active { background: #0066cc; color: #fff; }
+
+  /* メインレイアウト */
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* サイドバー */
+  #sidebar {
+    width: 320px; background: #fafafa;
+    border-right: 1px solid #dcdcdc;
+    display: flex; flex-direction: column; flex-shrink: 0;
+  }
+  .sidebar-ctrl { padding: 12px; border-bottom: 1px solid #eee; display: flex; align-items: center; }
+  .sidebar-ctrl span { font-size: 11px; font-weight: 700; color: #666; }
+  
+  #file-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .file-item {
+    display: flex; align-items: center; padding: 10px; font-size: 12px;
+    border-radius: 4px; cursor: pointer;
+    margin-bottom: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .file-item:hover { background: #f0f0ee; }
+  .file-item.active { background: #e4e4de; font-weight: 600; color: #000; }
+  
+  .file-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+
+  /* メインコンテンツエリア */
+  #content-container { flex: 1; display: flex; flex-direction: column; background: #fff; overflow: hidden; }
+
+  /* パネル共通 */
+  #panel-view { display: flex; flex-direction: column; height: 100%; }
+
+  /* 検索エリア */
+  #search-zone { padding: 16px 24px; border-bottom: 1px solid #eee; background: #fff; }
+  .search-box { display: flex; max-width: 550px; border: 1px solid #bbb; border-radius: 4px; overflow: hidden; }
+  #search-input { flex: 1; border: none; padding: 8px 12px; font-size: 13px; outline: none; }
+  #search-btn { border: none; background: #0066cc; color: #fff; padding: 0 16px; font-size: 12px; cursor: pointer; }
+  #search-btn:hover { background: #0052a3; }
+
+  /* ファイル表示領域 */
+  #view-body { flex: 1; overflow-y: auto; padding: 24px; position: relative; }
+  .placeholder { height: 100%; display: flex; align-items: center; justify-content: center; color: #999; font-size: 13px; }
+  
+  .doc-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: #111; }
+  .doc-meta { font-size: 11px; color: #aaa; font-family: monospace; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+  .doc-content { font-size: 13.5px; line-height: 1.6; color: #333; white-space: pre-wrap; }
+
+  /* 特殊コンテンツ用コンポーネント */
+  .media-box { border: 1px solid #ddd; background: #fafaf9; padding: 16px; border-radius: 6px; margin-top: 12px; max-width: 550px; }
+  .img-real { width: 100%; max-height: 400px; object-fit: contain; background: #eee; border: 1px solid #ccc; margin-bottom: 8px; display: block; }
+  .img-placeholder { width: 100%; height: 220px; background: #eee; display: flex; align-items: center; justify-content: center; color: #888; font-size: 12px; border: 1px dashed #ccc; margin-bottom: 8px; }
+  
+  /* 音声プレーヤー */
+  .audio-stub { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .audio-btn { background: #222; color: #fff; border: none; padding: 6px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; }
+  .audio-btn:hover { background: #444; }
+
+  /* 検索結果ポップアップエリア */
+  #search-result-popup { display: none; background: #f0f7ff; border: 1px solid #bcd5f3; padding: 16px; margin: 0 24px 16px 24px; border-radius: 4px; }
+  #search-result-popup.error { background: #fdf3f2; border-color: #f1c4c2; }
+  .popup-title { font-size: 12px; font-weight: 700; color: #0066cc; margin-bottom: 6px; }
+  #search-result-popup.error .popup-title { color: #c0392b; }
+  .popup-text { font-size: 12.5px; line-height: 1.5; }
+  .search-hit-item { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ccc; font-size: 12px; }
+
+  /* AIアシスタントモード用パネル */
+  #panel-ai { display: none; flex-direction: column; height: 100%; background: #fafaf9; }
+  #ai-chat-timeline { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .chat-bubble { max-width: 80%; padding: 12px 16px; font-size: 13px; line-height: 1.5; border-radius: 6px; white-space: pre-wrap; }
+  .chat-bubble.ai { background: #e8e8e3; color: #222; align-self: flex-start; border: 1px solid #dcdcdc; }
+  .chat-bubble.user { background: #0066cc; color: #fff; align-self: flex-end; }
+  
+  #ai-deck { border-top: 1px solid #e0e0e0; background: #fff; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .deck-title { font-size: 11px; font-weight: 700; color: #888; }
+  .cmd-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+  .cmd-btn { background: #f5f5f5; border: 1px solid #ccc; padding: 10px; font-size: 12px; font-weight: 600; text-align: left; border-radius: 4px; cursor: pointer; flex: 1; min-width: 140px; }
+  .cmd-btn:hover { background: #eef0ed; border-color: #888; }
+
+  #ai-input-zone { display: none; gap: 8px; align-items: center; }
+  #ai-keyword-input { flex: 1; padding: 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; outline: none; }
+  .weight-label { font-size: 11px; color: #666; font-weight: 600; margin-left: 4px; }
+  #ai-weight-slider { width: 100px; cursor: pointer; }
+  #weight-val { font-size: 11px; font-family: monospace; font-weight: bold; width: 25px; text-align: right; }
+  #ai-submit-btn { background: #1a1a1a; color: #fff; border: none; padding: 8px 16px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <img src="images/logo.png" alt="NextCloud" class="header-logo-img">
+  <div class="header-sub">同期済みフォルダ（阿部_バックアップ） / 03_次の企画（仮称：クマ）</div>
+  
+  <div class="nav-tabs">
+    <button class="nav-tab active" id="tab-view" onclick="switchTab('view')">📁 すべてのファイル</button>
+    <button class="nav-tab" id="tab-ai" onclick="switchTab('ai')">🤖 外部のデータ復元ツール</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div class="sidebar-ctrl">
+      <span id="file-count">ファイル一覧</span>
+    </div>
+    <div id="file-list"></div>
+    <div id="evidence-panel" style="padding:12px; border-top:1px solid #ddd; flex-shrink:0;">
+      <button onclick="toggleSelectMode()" id="select-mode-btn" style="width:100%; padding:8px; background:#666; color:#fff; border:none; border-radius:4px; cursor:pointer; margin-bottom:6px;">
+        ファイルを選ぶ
+      </button>
+      <div id="evidence-count" style="font-size:11px; color:#666; margin-bottom:6px;">選択中：0件</div>
+      <div id="evidence-error" style="display:none; font-size:11px; color:#c00; margin-bottom:6px;">
+        適切な文章を生成出来ません。もう一度お試し下さい。
+      </div>
+      <button onclick="submitEvidence()" style="width:100%; padding:8px; background:#333; color:#fff; border:none; border-radius:4px; cursor:pointer;">
+        記事を作成する
+      </button>
+    </div>
+  </div>
+
+  <div id="content-container">
+    <div id="panel-view">
+      <div id="search-zone">
+        <div class="search-box">
+          <input type="text" id="search-input" placeholder="フォルダ内を検索..." autocomplete="off">
+          <button id="search-btn" onclick="executeSearch()">検索</button>
+        </div>
+      </div>
+      
+      <div id="search-result-popup">
+        <div class="popup-title">✓ インデックス内検索結果</div>
+        <div class="popup-text" id="popup-text"></div>
+      </div>
+
+      <div id="view-body">
+        <div class="placeholder">左のリストからファイルを選択するか、上部の検索バーを利用してください。</div>
+      </div>
+    </div>
+
+    <div id="panel-ai">
+      <div id="ai-chat-timeline">
+        <div class="chat-bubble ai">【クラウド復元ツール：Ver 2.50-neural】
+暗号化セクターまたは不整合が確認される画像データファイルの再構成補助を行います。
+
+「破損データの再構成リクエスト」を実行し、解析ログから推測される最適なプロンプト拡張子、および強調ウェイト（重みづけ）を適用してください。</div>
+      </div>
+      
+      <div id="ai-deck">
+        <div class="deck-title">生成プロンプト制御要求</div>
+        <div class="cmd-grid">
+          <button class="cmd-btn" onclick="startImageAnalysis()">⚡ 破損データの再構成リクエスト</button>
+        </div>
+        
+        <div id="ai-input-zone">
+          <input type="text" id="ai-keyword-input" placeholder="キーワード入力..." autocomplete="off">
+          <span class="weight-label">強調ウェイト:</span>
+          <input type="range" id="ai-weight-slider" min="1.0" max="2.0" step="0.1" value="1.5" oninput="updateWeightDisplay(this.value)">
+          <span id="weight-val">1.5</span>
+          <button id="ai-submit-btn" onclick="submitAiKeyword()">適用</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let activeFileId = null;
+
+const selectedEvidence = new Set();
+const CORRECT_FILES = new Set(['broken', 'photo_01', 'photo_02', 'dummy_m21', 'dummy_m5']);
+let selectMode = false;
+
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  const btn = document.getElementById('select-mode-btn');
+  btn.style.background = selectMode ? '#0066cc' : '#666';
+  btn.textContent = selectMode ? '✓ 選択モード ON' : '証拠を選ぶ';
+  renderFileList();
+}
+
+function toggleEvidence(id) {
+  if (selectedEvidence.has(id)) {
+    selectedEvidence.delete(id);
+  } else {
+    selectedEvidence.add(id);
+  }
+  document.getElementById('evidence-count').textContent = `選択中：${selectedEvidence.size}件`;
+  document.getElementById('evidence-error').style.display = 'none';
+  renderFileList();
+}
+
+function submitEvidence() {
+  const isCorrect =
+    selectedEvidence.size === CORRECT_FILES.size &&
+    [...selectedEvidence].every(id => CORRECT_FILES.has(id));
+  if (isCorrect) {
+    showEnding();
+  } else {
+    document.getElementById('evidence-error').style.display = 'block';
+  }
+}
+
+function showEnding() {
+  const overlay = document.getElementById('ending-overlay');
+  const loading = document.getElementById('ending-loading');
+  const blog = document.getElementById('ending-blog');
+  overlay.style.display = 'flex';
+  loading.style.display = 'flex';
+  blog.style.display = 'none';
+  setTimeout(() => {
+    loading.style.display = 'none';
+    blog.style.display = 'block';
+  }, 5000);
+}
+
+let progress = {
+  photo_01_fixed: false,
+  broken_fixed: false
+};
+
+// ── 段階解禁の設定 ──────────────────────────────────────
+// 「何ファイル開いたら何枚目を解禁」のしきい値。後から自由に変更してください。
+const UNLOCK_THRESHOLDS = [
+  { count: 10,  id: 'dummy_p19' },  // 1枚目：IMG_5992
+  { count: 20,  id: 'dummy_p26' },  // 2枚目：IMG_6196
+  { count: 50,  id: 'dummy_p27' },  // 3枚目：IMG_6293
+  { count: 70, id: 'dummy_o11' },  // 4枚目：IMG_5249
+  { count: 100, id: 'dummy_o19' },  // 5枚目：IMG_5677
+];
+
+// 条件付き解禁の設定
+// キーワード解禁
+const KEYWORD_UNLOCK = [
+  { keyword: '長野県新田市', requires: 'photo_01', id: 'dummy_m16' },  // IMG_6344
+];
+// ファイルを開いたことによる連鎖解禁
+const OPEN_UNLOCK = [
+  { requires: 'dummy_m16', id: 'dummy_m21' },   // IMG_6344を開いたら→IMG_5979
+  { requires: 'broken', unlockAfterFixed: true, id: 'dummy_m5' },  // img_corrupted_00.dat復元完了で→IMG_6376
+];
+
+// 解禁済みIDを管理するSet
+let unlockedImages = new Set();
+// 開封済みファイルIDを記録するSet
+let openedFiles = new Set();
+
+function updateWeightDisplay(val) {
+  document.getElementById('weight-val').innerText = parseFloat(val).toFixed(1);
+}
+
+// ④メインシナリオ関連のIDや重要名は一切変更なし
+const FILE_DB = {
+  broken: { id: 'broken', name: 'img_corrupted_00.dat', date: '2024-10-15 03:12', type: 'image', meta: '更新日時: 2025-05-29 03:12 | サイズ: 1.2 MB', body: '【⚠️ファイル破損】全体に強力な暗号化、または激しいデータ破損。プレビュー不可。', isCorrupted: () => !progress.broken_fixed },
+  photo_01: { id: 'photo_01', name: 'photo_01.jpg', date: '2024-10-14 22:05', type: 'image', meta: '更新日時: 2025-05-30 22:05 | サイズ: 890 KB', body: '【⚠️ファイル破損】全体に強いモザイクと砂嵐。プレビュー不可。', isCorrupted: () => !progress.photo_01_fixed },
+  photo_02: { id: 'photo_02', name: 'photo_02.png', date: '2025-06-01 14:15', type: 'image', meta: '更新日時: 2025-05-29 14:15 | サイズ: 450 KB', body: ' ', isCorrupted: () => false },
+
+
+// ── ① 前任者の私生活・サボりデータ ──
+  dummy_p1: { id: 'dummy_p1', name: 'ウミ娘_タイカップ育成論コピペ.txt', date: '2024-10-14 11:20', type: 'text', meta: '更新日時: 2024-10-14 11:20', body: '今回のタイドカップ（京都芝1600m）の環境考察まとめ。\nとりあえずスピードとパワーはカンスト前提。スタミナは650＋根性根幹で足りるか？\n追込クリオグリが今回も暴れそうな気配。育成やり直し15回目、心が折れそう。原稿やらなきゃ。' },
+  dummy_p2: { id: 'dummy_p2', name: 'プルーフアーカイブ_限定ガチャ引くべきか.txt', date: '2024-10-12 01:05', type: 'text', meta: '更新日時: 2024-10-12 01:05', body: '復刻限定の性能評価ブログのコピペ：\n「総力戦トマト編成で必須級のデバフ持ち。石に余裕があるなら引くべきだが、来月の周年を考えるとスルーも視野」\nいや、引くわ。物欲センサー仕事しすぎ。今回の予算もうないぞ……。' },
+  dummy_p3: { id: 'dummy_p3', name: 'Amanzo買い物リスト_202410.txt', date: '2024-10-10 18:40', type: 'text', meta: '更新日時: 2024-10-10 18:40', body: '・キャットフード（いつものチキン味お徳用）\n・カップヌードル（シーフード）×1箱\n・トイレットペーパー（ダブル）\n・エレコム Type-C 延長ケーブル\n・ドキュメントスキャナー（中古でいいのないか探す）' },
+  dummy_p4: { id: 'dummy_p4', name: '欲しいものリストURLメモ.txt', date: '2024-10-09 14:10', type: 'text', meta: '更新日時: 2024-10-09 14:10', body: 'https://www.amazon.co.jp/hz/wishlist/ls/xxxxxx\n誰か誕生日に高級オフィスチェア買ってくれないかなぁ。腰が限界。' },
+    dummy_p6: { id: 'dummy_p6', name: '注文内容の確認：ドヨバシ・ドット・コム.eml', date: '2024-10-07 09:15', type: 'text', meta: '更新日時: 2024-10-07 09:15', body: '阿部 様\nヨドバシ・ドット・コムをご利用いただきありがとうございます。\n\n【ご注文商品】\n・単4形アルカリ乾電池 8本パック ×1\n・アイリスオーヤマ パックご飯 24食 ×1\n商品が出荷されましたら、改めて伝票番号をご連絡いたします。' },
+  dummy_p7: { id: 'dummy_p7', name: '臨時出費メモ（クレカ引き落としヤバい）.xlsx', date: '2024-10-06 12:00', type: 'text', meta: '更新日時: 2024-10-06 12:00', body: '【10月引き落とし予測】\n・家賃：¥68,000\n・電気・ガス・水道：¥14,500\n・クレカ（ソシャゲ・取材交通費）：¥92,300\n原稿料の振込が15日だからマジでギリギリ。今月はもう外食禁止。' },
+  dummy_p8: { id: 'dummy_p8', name: 'ソシャゲガチャ大爆死の愚痴メモ.txt', date: '2024-10-05 23:11', type: 'text', meta: '更新日時: 2024-10-05 23:11', body: '嘘だろ……確率壁すり抜け3連続ってマジか？\n200連天井まで回して全部最低レアのゴミまみれ。今月の食費が完全に消え去った。\n何が「ウミ娘ピックアップ確率UP！」だよ。二度と課金するかボケ。明日から毎日もやし生活確定。' },
+  dummy_p9: { id: 'dummy_p9', name: '居酒屋「鳥貴族」予約完了のお知らせ.eml', date: '2024-10-03 19:30', type: 'text', meta: '更新日時: 2024-10-03 19:30', body: '阿部 様\n以下の内容でご予約を承りました。\n\n日時：2024年10月06日 20:00〜\n人数：2名\n店舗：鳥貴族 土田店\n※ご来店をお待ちしております。' },
+  dummy_p10: { id: 'dummy_p10', name: '夜食の最強ラーメン組み合わせ.txt', date: '2024-10-01 02:40', type: 'text', meta: '更新日時: 2024-10-01 02:40', body: 'サッポロ一番みそラーメン＋とろけるチーズ＋おろしにんにく多め。\n深夜2時に原稿書いてる時に食うこれが一番飛ぶ。健康には悪い。' },
+  dummy_p11: { id: 'dummy_p11', name: 'マルカリ_発送手続きのお願い.eml', date: '2024-09-28 15:22', type: 'text', meta: '更新日時: 2024-09-28 15:22', body: 'マルカリ事務局からのお知らせ：\n「断捨離で出品した古本（まとめ売り）」が購入されました。\n2024-10-01までに発送手続きを行ってください。' },
+  dummy_p12: { id: 'dummy_p12', name: 'youtube_作業用BGM配信URL.url', date: '2024-09-25 21:00', type: 'text', meta: '更新日時: 2024-09-25 21:00', body: 'URL=https://www.youtube.com/watch?v=lofi-hiphop-rain\n' },
+  dummy_p13: { id: 'dummy_p13', name: 'コンビニ公共料金支払い期限リマインダー.txt', date: '2024-09-24 08:30', type: 'text', meta: '更新日時: 2024-09-24 08:30', body: '電気代の督促状が来てた。27日までにファミーで払わないと止められる危険性あり。最優先。' },
+  dummy_p14: { id: 'dummy_p14', name: 'ハトフリで見たいホラー映画リスト.txt', date: '2024-09-22 23:15', type: 'text', meta: '更新日時: 2024-09-22 23:15', body: '・悪神の継承\n・残傷―住んではいけない部屋―\n・祠【ほこら】\n' },
+  dummy_p15: { id: 'dummy_p15', name: '歯医者の予約日時確認メモ.txt', date: '2024-09-20 10:00', type: 'text', meta: '更新日時: 2024-09-20 10:00', body: '10月4日 14:30〜 奥歯の詰め物が取れたところの治療。遅刻厳禁。定期検診もついでに。' },
+  dummy_p16: { id: 'dummy_p16', name: 'Wi-Fiルーターの調子が悪い時の対処法.txt', date: '2024-09-18 19:40', type: 'text', meta: '更新日時: 2024-09-18 19:40', body: '1. 本体のコンセントを抜く\n2. 30秒待つ\n3. 再び挿す。これでも駄目ならサポートセンターに電凸。' },
+  dummy_p17: { id: 'dummy_p17', name: '部屋の衣替えやることメモ.txt', date: '2024-09-16 13:00', type: 'text', meta: '更新日時: 2024-09-16 13:00', body: '夏服を圧縮袋に詰めてクローゼットの奥へ。長袖シャツとパーカーを出してハンガーにかける。コインランドリーで毛布洗う。' },
+  dummy_p18: { id: 'dummy_p18', name: 'UnberEatsのプロモコード履歴.txt', date: '2024-09-15 12:10', type: 'text', meta: '更新日時: 2024-09-15 12:10', body: 'eats-vj7mfsytw（750円OFF）期限切れ\neats-kl9nkafwery（初回限定、もう使えない）\n最近送料高すぎて自炊に変えないと死ぬ。' },
+    dummy_p20: { id: 'dummy_p20', name: 'サブスク解約忘れ防止リスト.txt', date: '2024-09-10 09:00', type: 'text', meta: '更新日時: 2024-09-10 09:00', body: '・プレミアム音楽配信（無料トライアル 9/24まで）\n・雑誌読み放題（10/01までに解約しないと自動更新）' },
+  dummy_p21: { id: 'dummy_p21', name: '洋服のサイズ早見表（自分用）.txt', date: '2024-09-08 15:45', type: 'text', meta: '更新日時: 2024-09-08 15:45', body: 'ジャケット：Lサイズ\nジーンズ：31インチ\nスニーカー：27.5cm（メーカーによっては28.0cm）' },
+  dummy_p22: { id: 'dummy_p22', name: 'スマホのストレージ整理候補.txt', date: '2024-09-05 21:30', type: 'text', meta: '更新日時: 2024-09-05 21:30', body: '・ウミ娘のキャッシュ消去\n・どうでもいい景色の写真フォルダ全削除' },
+  dummy_p23: { id: 'dummy_p23', name: '近所の24時間コインランドリーの場所.txt', date: '2024-09-02 11:15', type: 'text', meta: '更新日時: 2024-09-02 11:15', body: 'アパートから徒歩4分、セブンイレブンの交差点を左折。乾燥機が強力で重宝してる。' },
+  dummy_p24: { id: 'dummy_p24', name: '散髪のタイミング備忘録.txt', date: '2024-08-30 16:00', type: 'text', meta: '更新日時: 2024-08-30 16:00', body: '前回：8月12日。そろそろ襟足が鬱陶しくなってきた。10月頭の取材前にいつもの格安カットに行く。' },
+  dummy_p25: { id: 'dummy_p25', name: '粗大ゴミ回収の受付番号メモ.txt', date: '2024-08-27 10:25', type: 'text', meta: '更新日時: 2024-08-27 10:25', body: '壊れたカラーボックスの回収。受付番号：N-882910。400円のシールを買って貼っておくこと。' },
+  interview_02: { id: 'interview_02', name: '録音_近隣商店聞き込み.mp3', date: '2024-10-13 17:05', type: 'audio',src: 'audio/interview_neighbor02.mp3', meta: '更新日時: 2025-06-27 17:05 | 長さ: 0:38', body: '' },
+
+  
+  // ── ② オカルトライターとしてのボツ原稿・取材資料 ──
+  dummy_o1: { id: 'dummy_o1', name: '202409_【入稿】月刊オカルトJAPAN_Vol.8.docx', date: '2024-09-30 23:45', type: 'text', meta: '更新日時: 2024-09-30 23:45', body: '特集：現代社会に潜む謎の「擬態系都市伝説」\n近年、SNSを中心に『人間になりすます何か』の目撃談が相次いでいる……（以下、2000文字の原稿データ）' },
+  dummy_o2: { id: 'dummy_o2', name: '未完_八王子某所の「喋る自販機」取材ラフ.txt', date: '2024-09-27 16:10', type: 'text', meta: '更新日時: 2024-09-27 16:10', body: '噂：深夜3時、特定のコインを入れると、お釣りの返却口から「子供の声で愚痴を喋る」自販機があるらしい。\n現地調査結果：ただの基盤の劣化による電子ノイズだった。ボツ。' },
+  dummy_o3: { id: 'dummy_o3', name: '【ボツ】ネットで拾った洒落怖コピペまとめ.txt', date: '2024-09-24 11:00', type: 'text', meta: '更新日時: 2024-09-24 11:00', body: '・きさらぎ駅系の異界駅プロット\n・コトリバコに似た呪いの箱の検証\nどれも手垢がつきすぎてて今の編集部には通らない。もっと泥臭い、地方の狂気みたいなネタが欲しい。' },
+  dummy_o4: { id: 'dummy_o4', name: '取材費精算書_2024_09（領収書紛失あり）.xlsx', date: '2024-09-22 14:00', type: 'text', meta: '更新日時: 2024-09-22 14:00', body: '9/12：新宿〜高尾（往復交通費） ¥1,140\n9/15：資料コピー代 ¥400\n9/18：タクシー代（領収書を雨で濡らして紛失、経費落ちるか要交渉） ¥3,200' },
+  dummy_o6: { id: 'dummy_o6', name: 'audio_コックリさんの後遺症（高校生聞き込み）.mp3', date: '2024-09-18 16:45', type: 'audio', meta: '更新日時: 2024-09-18 16:45', body: '「……それから、あいつ夜になると部屋の四隅に向かってずっとブツブツ謝るようになって。学校も来なくなっちゃったんです」と語る男子高校生の怯えた声が記録されている。' },
+  dummy_o7: { id: 'dummy_o7', name: '心霊スポット凸計画_犬鳴トンネル（結局行ってない）.txt', date: '2024-09-15 10:20', type: 'text', meta: '更新日時: 2024-09-15 10:20', body: '九州までの遠征費が出ない。編集長に直談判したけど「予算ゼロ」ってバッサリ切られた。自腹で行くには遠すぎる、却下。' },
+  dummy_o8: { id: 'dummy_o8', name: '怪談師〇〇氏へのインタビュー質問案.docx', date: '2024-09-12 13:00', type: 'text', meta: '更新日時: 2024-09-12 13:00', body: '1. 今までで一番「ガチでヤバい」と思った呪物の話\n2. 怪談を喋っている最中に起きた怪奇現象について\n3. 同業者から聞いた、表に出せない話について' },
+  dummy_o9: { id: 'dummy_o9', name: '【不採用】実話怪談_深夜の高速道路でヒッチハイクする老人.txt', date: '2024-09-10 19:15', type: 'text', meta: '更新日時: 2024-09-10 19:15', body: '体験者：トラック運転手のMさん。東名高速で目撃したというが、ただの見間違いか徘徊老人の可能性が高く、怪談としてのフックが弱いと言われ不採用。' },
+  dummy_o10: { id: 'dummy_o10', name: '原稿料未振込みの件催促.eml', date: '2024-09-08 11:30', type: 'text', meta: '更新日時: 2024-09-08 11:30', body: '海曹出版 編集部様\nお世話になっております。ライターの阿部です。\n7月に入稿いたしました「ネット怪談の深層」の原稿料につきまして、まだ振込の確認が取れておらず……' },
+    dummy_o12: { id: 'dummy_o12', name: '実話怪談コンテスト応募要項.pdf', date: '2024-09-01 09:00', type: 'text', meta: '更新日時: 2024-09-01 09:00', body: '第15回 実話怪談大賞 募集要項\n賞金：50万円\n締切：2024年10月末日\nプロ・アマ問わず。実際に体験した、あるいは取材に基づいた未発表の怪談に限る。' },
+  dummy_o13: { id: 'dummy_o13', name: '取材アポ：呉井寺住職.eml', date: '2024-08-28 14:20', type: 'text', meta: '更新日時: 2024-08-28 14:20', body: '「当寺に伝わる過去帳やお札に関する取材の件ですが、住職が高齢であること、また過去に心ないネット配信者に荒らされた経緯があるため、一切の取材をお断りしております」' },
+  dummy_o14: { id: 'dummy_o14', name: 'オカルト系YouTuberとのコラボ企画案.pptx', date: '2024-08-25 18:00', type: 'text', meta: '更新日時: 2024-08-25 18:00', body: '登録者数5万人のオカルト系チャンネル「オカルトーク」との合同事故物件凸企画。\nあちらの予算で長野か山梨の廃村に行けないか打診。返事待ち。' },
+  dummy_o15: { id: 'dummy_o15', name: 'WEBコラム_現代の都市伝説とネットミーム.txt', date: '2024-08-22 10:15', type: 'text', meta: '更新日時: 2024-08-22 10:15', body: 'バックルーム（The Backrooms）やネットコミュニティが創作し、あたかも現実であるかのように消費されるミームについての考察コラム。' },
+  dummy_o16: { id: 'dummy_o16', name: '都市伝説：差出人不明の「真っ白なハガキ」.txt', date: '2024-08-20 14:10', type: 'text', meta: '更新日時: 2024-08-20 14:10', body: 'ポストに文字が一切書かれていない白いハガキが届く。それを捨てずに持っていると、3日後に知らない番号から「読めた？」と電話がかかってくるという噂。' },
+  dummy_o17: { id: 'dummy_o17', name: '取材メモ：池袋のコインロッカー怪談.docx', date: '2024-08-18 11:45', type: 'text', meta: '更新日時: 2024-08-18 11:45', body: '90年代後半に流行った噂の再検証。特定のロッカーを特定の鍵で開けると、中に古い雛人形が入っているという話。当時の新聞アーカイブを調べる必要あり。' },
+  dummy_o18: { id: 'dummy_o18', name: '霊能者葉山先生の除霊料金表一覧.pdf', date: '2024-08-15 16:20', type: 'text', meta: '更新日時: 2024-08-15 16:20', body: '家屋の清祓：5万円〜\n生霊の未練除去：10万円〜\n（高すぎる。本当に効くのか怪しいので裏付け取材が必要）' },
+   dummy_o20: { id: 'dummy_o20', name: '検証ボツ_旧トンネル内の不気味な足音.txt', date: '2024-08-10 13:10', type: 'text', meta: '更新日時: 2024-08-10 13:10', body: '音響解析の結果、トンネル奥からの漏水が反響して反転した音だった。怪奇現象ではないため記事化は見送り。' },
+  dummy_o21: { id: 'dummy_o21', name: '読者からの投稿怪談_深夜の踏切の影.txt', date: '2024-08-08 19:40', type: 'text', meta: '更新日時: 2024-08-08 19:40', body: 'ペンネーム：猫丸さん。毎日深夜1時半に通過する踏切で、遮断機が上がっているのに一歩も動かないスーツの男を見るという体験談。内容がシンプルすぎて没。' },
+  dummy_o22: { id: 'dummy_o22', name: 'オカルト雑誌バックナンバー発注書.xlsx', date: '2024-08-05 10:00', type: 'text', meta: '更新日時: 2024-08-05 10:00', body: '1994年4月号（特集：降霊術の危険性）\n1997年11月号（特集：消えた村の系譜）\n神保町の古書店に在庫確認済み、引き取りに行く。' },
+  dummy_o23: { id: 'dummy_o23', name: 'photo_山中で見つけた朽ちた鳥居.jpg', date: '2024-08-03 15:15', type: 'image', meta: '更新日時: 2024-08-03 15:15 | サイズ: 710 KB', desc: 'ハイキングコースから大きく外れた藪の中で発見した、根元から折れかけている木製の鳥居の写真。周囲にしめ縄の残骸が散らばっている。' },
+  dummy_o24: { id: 'dummy_o24', name: 'コラム草案：なぜ人は呪物を求めるのか.docx', date: '2024-08-01 11:20', type: 'text', meta: '更新日時: 2024-08-01 11:20', body: '不条理な現実に理由をつけたいという人間の防衛本能。呪いという明確な悪意が存在する方が、偶然の不幸よりも納得しやすいという心理についての心理学的アプローチ。' },
+  dummy_o25: { id: 'dummy_o25', name: '怪事件アーカイブ_1982年かなみちゃん失踪事件.txt', date: '2024-07-28 17:40', type: 'text', meta: '更新日時: 2024-07-28 17:40', body: '当時3歳の女児が神社の境内から忽然と姿を消した事件。神隠しと騒がれたが、当時の警察の初動ミスが原因の可能性大。オカルト的な要素は薄い。' },
+  interview_01: { id: 'interview_01', name: '録音_アパート隣人聞き込み.mp3', date: '2024-10-13 16:20', type: 'audio',src: 'audio/interview_neighbor01.mp3', meta: '更新日時: 2025-06-27 16:20 | 長さ: 0:45', body: '503号室' },
+
+
+  // ── ③ システムのログ・ゴミ・文字化け ──
+  dummy_s1: { id: 'dummy_s1', name: 'sys_log_20241012_err.dat', date: '2024-10-12 04:12', type: 'text', meta: '更新日時: 2024-10-12 04:12', body: '[CRITICAL_ERR] Sync failed at sector 0x4FEE3. Remote host closed connection abruptly. Retry aborted after 3 attempts.' },
+  dummy_s2: { id: 'dummy_s2', name: '【重要】アカウントのセキュリティが危険に晒されています.eml', date: '2024-10-11 03:02', type: 'text', meta: '更新日時: 2024-10-11 03:02', body: '※これは自動送信された警告メールです。\nお客様のアカウントに対して、通常とは異なるIPアドレス（ロシア連邦）からの不正なログイン試行が検知されました。' },
+  dummy_s3: { id: 'dummy_s3', name: '~Internal_Temp_Data.tmp', date: '2024-10-09 22:15', type: 'text', meta: '更新日時: 2024-10-09 22:15', body: '[TEMP DATA BUFFER]\n01010010 01000101 01000111 01010101 01001100 01000001 01010100 01001111 01010010\n(一時的なセッションキャッシュデータです)' },
+  dummy_s4: { id: 'dummy_s4', name: 'ai_chat_テスト出力.txt', date: '2024-10-06 15:40', type: 'text', meta: '更新日時: 2024-10-06 15:40', body: 'ユーザー:創作の資料として知りたいんですが、個人が「3.5kgの大量の金属」を一度に、あるいは効率よく手に入れる方法には何がありますか？\n\nchatNPD:\n3.5kgの金属か、なかなかの重量だね。どのような種類の金属を想定しているか、あるいはその出所（ストーリー上の演出）によって、いくつかのアプローチが考えられるよ。\n\n1. 産業廃棄物やスクラップからの回収\n解体業者や自動車の整備工場、あるいは家電リサイクルプラザなどを当たる方法だ。古い車のバッテリー（鉛）や、エアコンの室外機（銅・アルミ）なら、数キロ単位 of 金属を比較的容易に確保できる。\n\n2. 彫金用・工業用の地金（インゴット）の購入\nもっとも合法かつ確実な方法だ。専門の業者から真鍮や銅、アルミニウムのインゴット（塊）を購入すれば、3.5kg程度なら一般人でも簡単に注文して手に入れられるよ。\n\n3. 火葬後の残灰（お骨上げの残り）からの回収\n少し特殊で不気味な方法だけど、火葬場に残された灰から集めるアプローチもある。人間の体内には、人工関節（チタンやステンレス）、歯科治療の金歯・銀歯、あるいは棺の飾り金具などが含まれている。これらは火葬後も溶けずに「残灰」として残るため、自治体や専門業者がこれを回収・精錬して数キロ単位の金属を取り出すケースが実在するんだ。物語の背景としては強いインパクトを与えられるね。\n\n4. 大量の硬貨（通貨）の融解\n現代日本なら、10円玉（銅）や1円玉（アルミニウム）を大量に集める方法だ。ただし、日本の法律（貨幣損傷等取締法）では硬貨を溶かすことは禁じられているから、キャラクターが法を犯す、あるいは狂気を演出するシチュエーションに向いている。\n\nどんなキャラクターが、どんな目的でその金属を求めているかによって、最適な「手段」を選んでみるといい。どれか深掘りしたい設定はあるかい？' },
+  dummy_s5: { id: 'dummy_s5', name: 'desktop.ini', date: '2024-10-04 12:00', type: 'text', meta: '更新日時: 2024-10-04 12:00', body: '[.ShellClassInfo]\nLocalizedResourceName=@%SystemRoot%\\system32\\shell32.dll,-21770\nIconResource=%SystemRoot%\\system32\\imageres.dll,-112' },
+  dummy_s6: { id: 'dummy_s6', name: 'backup_old_202408.zip', date: '2024-08-31 23:59', type: 'text', meta: '更新日時: 2024-08-31 23:59', body: '（アーカイブファイルのため、ブラウザ上からは中身を展開できません。解凍ツールを使用してください）' },
+  dummy_s7: { id: 'dummy_s7', name: 'config_setting.json', date: '2024-08-25 09:10', type: 'text', meta: '更新日時: 2024-08-25 09:10', body: '{\n  "theme": "dark",\n  "auto_sync": true,\n  "encryption_level": "AES-256",\n  "timeout_ms": 5000\n}' },
+  dummy_s8: { id: 'dummy_s8', name: 'analytics_report_blog.csv', date: '2024-08-20 00:05', type: 'text', meta: '更新日時: 2024-08-20 00:05', body: 'Date,PV,UU,BounceRate\n2024-08-14,142,30,45.2%\n2024-08-15,189,42,41.0%\n2024-08-16,502,110,38.5% (※怪談記事がプチバズりした日)' },
+  dummy_s9: { id: 'dummy_s9', name: '🔒_encrypted_pass.dat', date: '2024-08-15 14:30', type: 'text', meta: '更新日時: 2024-08-15 14:30', body: '[ENCRYPTED BINARY DATA]\nU2FsdGVkX19vNStqZTl5Ykh0cjh4ZldXMG11ZXh0YjU4Y1F0L0V3MD09' },
+  dummy_s10: { id: 'dummy_s10', name: 'text_corrupted_.txt', date: '2024-08-10 11:22', type: 'text', meta: '更新日時: 2024-08-10 11:22', body: '縺ゅ縺・縺・縺・縺・縺・縺励※縺・縺溘□縺励∪縺励ｇ縺・縺・縺・縺・\n' },
+  dummy_s11: { id: 'dummy_s11', name: 'npm_debug_log.log', date: '2024-08-08 05:12', type: 'text', meta: '更新日時: 2024-08-08 05:12', body: '0 info it worked if it ends with ok\n1 verbose cli [ \'node\', \'npm\', \'run\', \'build\' ]\n2 info using npm@9.5.0\n3 info using node@v18.15.0\n4 error code ELIFECYCLE' },
+  dummy_s12: { id: 'dummy_s12', name: '.gitignore', date: '2024-08-05 12:00', type: 'text', meta: '更新日時: 2024-08-05 12:00', body: 'node_modules/\n.DS_Store\n*.log\n.env' },
+  dummy_s13: { id: 'dummy_s13', name: 'manifest_cache.bin', date: '2024-08-02 22:10', type: 'text', meta: '更新日時: 2024-08-02 22:10', body: '[BINARY INDEX CACHE] 8f8f7c6b5a4a3b2c1d0e\n(インデックス高速化用のキャッシュバイナリ)' },
+  dummy_s14: { id: 'dummy_s14', name: 'cron_job_status.report', date: '2024-07-30 00:00', type: 'text', meta: '更新日時: 2024-07-30 00:00', body: 'Daily Backup Task: SUCCESS\nDatabase Optimization: SUCCESS\nLog Rotation: SUCCESS' },
+  dummy_s15: { id: 'dummy_s15', name: 'index_corrupt_backup.bak', date: '2024-07-25 14:50', type: 'text', meta: '更新日時: 2024-07-25 14:50', body: '縺薙ｌ縺ｯ縺ｷ縺励ｇ縺・縺・縺・縺溘□縺励∪縺励ｇ縺・\n(破損セクターの自動退避バックアップデータ)' },
+  dummy_s16: { id: 'dummy_s16', name: 'hosts.sam', date: '2024-07-22 09:00', type: 'text', meta: '更新日時: 2024-07-22 09:00', body: '# This is a sample HOSTS file used by Microsoft TCP/IP for Windows.\n# 127.0.0.1       localhost' },
+  dummy_s17: { id: 'dummy_s17', name: 'local_storage_dump.json', date: '2024-07-20 18:30', type: 'text', meta: '更新日時: 2024-07-20 18:30', body: '{"user_id":"abe_writer","session_expiry":1698710400,"volume_settings":{"muted":false,"level":80}}' },
+  dummy_s18: { id: 'dummy_s18', name: 'temp_mail_draft_02.tmp', date: '2024-07-18 11:12', type: 'text', meta: '更新日時: 2024-07-18 11:12', body: '[AUTO_SAVE_DRAFT]\n件名：Re:原稿の修正について\n本文：こちらの都合により第3章の記述をすべて削除し、新たなテーマに基づくコラム（1200字）へと差し替えます。\n構成会議の段階から大幅な方針変更となりますが、明朝8時までに修正稿のテキストデータを秦野さんのメールアドレス宛に送付いたします。\nなお、印刷所への最終入稿（下版）データのデッドラインが明日午前中となっておりますため、恐れ入りますが明朝8時30分までに内容のご確認と最終GOの判断をいただけますと幸いです。万が一これを超える場合、全体の台割および進行スケジュールに影響が出る可能性がございますので、予めご留意ください。\n取り急ぎ、これより執筆作業に入ります。\nよろしくお願いいたします。' },
+  dummy_s19: { id: 'dummy_s19', name: 'system_hardware_info.nfo', date: '2024-07-15 14:00', type: 'text', meta: '更新日時: 2024-07-15 14:00', body: 'OS Name: Microsoft Windows 11 Home\nProcessor: Intel Core i7-1165G7\nTotal Physical Memory: 16,128 MB' },
+  dummy_s20: { id: 'dummy_s20', name: 'error_dump_0842.txt', date: '2024-07-12 23:45', type: 'text', meta: '更新日時: 2024-07-12 23:45', body: 'Exception in thread "main" java.lang.NullPointerException\n  at com.cloud.sync.FileHandler.process(FileHandler.java:42)' },
+  dummy_s21: { id: 'dummy_s21', name: '.htaccess_old', date: '2024-07-10 10:15', type: 'text', meta: '更新日時: 2024-07-10 10:15', body: 'RewriteEngine On\nRewriteCond %{REQUEST_FILENAME} !-f\nRewriteRule ^([^\\x23]*)$ index.php?_url=$1 [QSA,L]' },
+  dummy_s22: { id: 'dummy_s22', name: 'device_driver_patch.inf', date: '2024-07-08 09:30', type: 'text', meta: '更新日時: 2024-07-08 09:30', body: '; Installation inf for virtual storage device driver\n[Version]\nSignature="$WINDOWS NT$"' },
+  dummy_s23: { id: 'dummy_s23', name: 'network_route_print.txt', date: '2024-07-05 16:22', type: 'text', meta: '更新日時: 2024-07-05 16:22', body: 'IPv4 Route Table\nActive Routes:\nNetwork Destination        Netmask          Gateway         Interface' },
+  dummy_s24: { id: 'dummy_s24', name: 'cert_key_exchange.pub', date: '2024-07-02 11:00', type: 'text', meta: '更新日時: 2024-07-02 11:00', body: '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Y7V……\n-----END PUBLIC KEY-----' },
+  dummy_s25: { id: 'dummy_s25', name: 'lost_clusters_report.log', date: '2024-06-30 23:58', type: 'text', meta: '更新日時: 2024-06-30 23:58', body: 'Chkdsk found 0 lost clusters in 0 chains.\nFree space verification is complete.' },
+
+  // ── ④ 本筋に掠るミスリード用の資料群 ──
+  dummy_m1: { id: 'dummy_m1', name: '長野県内の「空き家放置問題」に関するレポート.pdf', date: '2024-10-14 15:30', type: 'text', meta: '更新日時: 2024-10-14 15:30', body: '【長野県自治体レポート抜粋】\n過疎化に伴い、茅根市を含む南信地域での空き家率が過去最高を記録。管理者のいない物件が不法占拠や犯罪の温床になるケースが指摘されており、地域住民からの不安の声が高まっている。これを受けて、各自治体では「空き家対策特別措置法」に基づく身元調査の徹底や、所有者特定のための住民票追跡調査を強化している。特に、夜間の不審な出入りが報告されている物件に対しては、地域警察と連携した合同パトロールや、行政代執り行いによる早期解体・封鎖措置の前倒しが検討され始めた。防犯面でのリスクを最小限に抑えるため、住民による「空き家監視ネットワーク」の構築など、地域一体となった監視体制の整備が急務となっている。' },
+  dummy_m2: { id: 'dummy_m2', name: 'フリマアプリ_利用規約改定の魚拓.html', date: '2024-10-12 11:05', type: 'text', meta: '更新日時: 2024-10-12 11:05', body: '【重要なお知らせ】出品禁止物に関する規約改定について\n「手作りの呪物」「科学的根拠のない開運グッズ」等の出品に対し、ユーザーからの通報が相次いだため、パトロール体制を強化いたします。悪質なアカウントは即座に停止措置とします。' },
+  dummy_m3: { id: 'dummy_m3', name: '茅根市_観光パンフレット（電子版）.pdf', date: '2024-10-09 10:20', type: 'text', meta: '更新日時: 2024-10-09 10:20', body: '長野県茅根市：南信州の豊かな自然と、伝統の「飯田人形劇」の街。\n特産品のリンゴや、美しい天竜峡の景色をお楽しみください。おいでなんしょ飯田へ！' },
+  dummy_m4: { id: 'dummy_m4', name: '日本の伝統的な人形・ぬいぐるみの歴史.txt', date: '2024-10-07 14:15', type: 'text', meta: '更新日時: 2024-10-07 14:15', body: '古来より人形は子供の玩具であると同時に、人間の「身代わり」として穢れを引き受ける呪術的な道具としての側面を持っていた。特に古い歴史を持つ地方では、今でも髪の毛や衣服の一部を人形に括り付け、川に流したり土に埋めたりすることで、個人の病魔や災厄を「移し替える」私的な信仰が形を変えて残っている。このような身代わり人形（依代）は、共同体の平穏を保つための公的な祭祀から、個人の怨恨や執着を処理するための私的な呪術にいたるまで、極めて広範囲に用いられてきた。\n特に近代以前の医学が未発達だった時代において、幼児の生存率の低さは深刻な共同体の課題であり、人形に子供の「魂の器」としての役割を一時的に担わせることで、現世に命を繋ぎ止めようとする試みも少なくなかった。\nしかし、これらの行為は一歩間違えれば、生者と死者、あるいは物質と生命の境界線を曖昧にする危険性を孕んでいる。玩具が時に不気味な血通いを感じさせるのは、かつてそれに託された「誰かの身代わり」としての情念や、穢れを吸い込んだ道具としての記憶が、私たちの本能的な恐怖を刺激するからに他ならない。' },
+    dummy_m6: { id: 'dummy_m6', name: '金属スクラップ相場価格の推移_2024.xlsx', date: '2024-10-01 11:00', type: 'text', meta: '更新日時: 2024-10-01 11:00', body: '2024年 銅・アルミ・貴金属リサイクル市場動向報告\n金・銀・パラジウムの買取価格が上昇傾向。歯科用金属（いわゆる12%金パラ、銀歯の素材）のスクラップ需要が急増中。' },
+  dummy_m7: { id: 'dummy_m7', name: '地方自治体の特殊な火葬条例について.txt', date: '2024-09-28 09:15', type: 'text', meta: '更新日時: 2024-09-28 09:15', body: '日本の多くの自治体では、火葬後の残骨灰に含まれる有価物は自治体に帰属し、売却されて財源となる。しかし一部の地域では、現場の裁量や古い慣習が残っている場合があり火葬場職員や特定の関係者によって密かに回収・処理されるケースが長年黙認されてきた。これらは公的な財源に組み込まれることなく、現場の「慰労金」や施設の維持費という名目のもと、不透明な形で処理されることが少なくない。\n近年では行政の透明化やコンプライアンスの遵守が叫ばれ、大半の自治体が条例で残骨灰の帰属を明確に規定し始めている。しかし、地方自治体や小規模な火葬場においては、依然として法的な境界線が曖昧なまま、過去の慣例を踏襲している地域も存在するのが実状である。遺族の感情への配慮という側面もあり、これらの有価物の取り扱いに関する実態調査や厳格なルール化は、未だデリケートな問題として議論が避けられる傾向にある。' },
+  dummy_m8: { id: 'dummy_m8', name: 'メルカリ出品テクニックまとめ（高額取引のコツ）.docx', date: '2024-09-25 15:40', type: 'text', meta: '更新日時: 2024-09-25 15:40', body: '・商品の写真は自然光が入る明るい部屋で撮ること（※鏡面反射に注意）\n・タイトルには検索されやすいキーワードを網羅する\n・怪しいアカウントと思われると通報されやすいので丁寧なプロフが必須' },
+  dummy_m9: { id: 'dummy_m9', name: '全国の「人形供養」で有名な寺社リスト.xlsx', date: '2024-09-22 10:20', type: 'text', meta: '更新日時: 2024-09-22 10:20', body: '和歌山・淡嶋神社（雛人形・呪いの髪伸び人形）\n東京・明治神宮（毎年秋に大規模な人形感謝祭）\n長野・〇〇寺（地域に根付いた古びた身代わり人形の供養）' },
+  dummy_m10: { id: 'dummy_m10', name: 'webコラム：『ぬいぐるみに骨を入れる』呪術の噂.txt', date: '2024-09-19 14:12', type: 'text', meta: '更新日時: 2024-09-19 14:12', body: '一部のネット怪談で囁かれる「骨入れぬいぐるみ」の概念。愛する者の遺骨や、特定の部位を綿の代わりに詰めることで、対象への歪んだ未練や呪いを定着させる儀式があるとされるがその多くは、現代のSNSや匿名掲示板を通じて拡散された「都市伝説（実話怪談）」の体裁をとっている。\nしかし、民俗学的な観点から見れば、この概念は決して完全な創作とは言い切れない。古来より日本に存在する「依代（よりしろ）」や、死者の衣服を人形に着せて供養する「雛供養」「冥婚」といった呪術的・宗教的習俗の変形、あるいはその現代的解釈として捉えることができるからである。\nオカルト的な文脈において、この「骨入れぬいぐるみ」が特に忌まわしく語られる理由は、それが「供養」ではなく、生者のエゴによる「現世への縛り付け（呪縛）」を目的としている点にある。火葬後の残骨灰や、特定の執着が宿るとされる部位（毛髪や爪、あるいは生前好んだ遺品など）をマスコットの内部に封じる行為は、死者の魂の循環を拒絶し、物質的な肉体（器）を疑似的に再構築しようとする試みに他ならない。\n一説には、こうして作られたぬいぐるみは次第に持ち主の精神を蝕み、やがて「中身の主」と同調したかのような奇異な挙動を見せ始めると噂される。それは単なる怪奇現象というよりも、分不相応な依代を与えられた死者の怨嗟であり、同時に、歪んだ未練が生み出した持ち主自身の狂気の投影（精神医学で言うところの対象喪失による防衛機軸の破綻）がもたらす悲劇として、今もネットの片隅で静かに語り継がれている。' },
+  dummy_m11: { id: 'dummy_m11', name: '住民票移動手続きに関する注意事項（飯田市）.pdf', date: '2024-09-16 11:00', type: 'text', meta: '更新日時: 2024-09-16 11:00', body: '市外からの転入届に必要なもの：前住所地の転出証明書、マイナンバーカード、印鑑。窓口は市民課2番カウンターとなります。' },
+    dummy_m13: { id: 'dummy_m13', name: '歯科医師が語る「乳歯と永久歯の構造違い」.txt', date: '2024-09-11 13:20', type: 'text', meta: '更新日時: 2024-09-11 13:20', body: '乳歯は永久歯に比べてエナメル質や象牙質が薄く、虫歯の進行が非常に早い。また、根の構造が吸収されやすいため、生え変わりの時期になると自然とポロリと抜け落ちる特徴がある。' },
+  dummy_m14: { id: 'dummy_m14', name: '某オークションの「ハンドメイド・ジャンク」カテゴリ統計.csv', date: '2024-09-09 10:15', type: 'text', meta: '更新日時: 2024-09-09 10:15', body: '月間出品数：14,202件、平均取引単価：3,500円。説明文に「詳細不明」「蔵から出てきた」と書かれた怪しい骨董品ほど、コアなマニアの間で入札が競り上がる傾向。' },
+  dummy_m15: { id: 'dummy_m15', name: '家庭用はかり（キッチンスケール）の精度と上限.txt', date: '2024-09-06 08:40', type: 'text', meta: '更新日時: 2024-09-06 08:40', body: '一般的な安価なキッチンスケールは、最大計量が1kgまたは2kg、高級なものでも最大3kgまでとなっている。もしそれを超える重量（例えば3.5kgなど）を載せた場合、エラー表示が出るか、メーターが振り切れて故障の原因となる。' },
+
+  dummy_m17: { id: 'dummy_m17', name: '精神医学コラム：『対象喪失と代替物の過剰な擬人化』.pdf', date: '2024-09-01 11:30', type: 'text', meta: '更新日時: 2024-09-01 11:30', body: '家族や子供を突如失った者が、その強い喪失ストレス（グリーフ）から逃れるため、手元に残された人形やぬいぐるみを「生きている本物の子供」と思い込み、過剰に世話を焼くケースがある。重症化すると、それに食事を与えたり、身体的な「改造」を施す行動に変調し客観的な現実との乖離が顕著となる。例えば、人形の内部に液体を流し込む、あるいは「成長」を擬似的に表現するためにパーツを無理に繋ぎ合わせる等の奇異な行動（Mutilation-like Care）が観察される。これらは、失った対象を「静止した物質」として受け入れることへの強烈な拒絶であり、自己の内的世界における『生命の連続性』を物理的に証明しようとする防衛機軸の極致と言える。\n\n臨床において特に留意すべきは、この代替物に対する過剰な愛着が、ある種の「被害妄想」や「他者への強い攻撃性」へと転じる境界線である。多くの場合、患者は周囲の人間が「それはただの人形だ」という現実を突きつけてくることに極めて敏感であり、代替物を守るために社会的な孤立を自ら加速させる。\n\nまた、グリーフケアの観点からこの代替物を強制的に引き離す（剥奪する）アプローチは、患者の精神的均衡を致命的に破壊するリスクが高い。代替物はすでに単なる玩具ではなく、患者の崩壊しかけた自我を繋ぎ止める「外部化された心臓」そのものであるため、剥奪は二重の対象喪失（二次的トラウマ）を引き起こし、深刻な緊張病状態や自殺念慮を誘発する引き金となり得る。\n\nしたがって、治療的介入においては、代替物の存在を一時的に「移行対象」として部分的に容認しつつ、患者が代替物を介してしか表出できない「語られぬ怒りと罪悪感」を少しずつ言語化させていく、長期的な支持的精神療法が不可欠とされる。' },
+  dummy_m18: { id: 'dummy_m18', name: '宅配便の集候依頼受付通知メール.eml', date: '2024-08-29 14:00', type: 'text', meta: '更新日時: 2024-08-29 14:00', body: 'トマト運輸より：集荷のご依頼を承りました。\n日時：2024年09月02日 14:00-16:00\n品名：精密機器・工芸品（ワレモノ注意）\n発送先：東京都' },
+  dummy_m19: { id: 'dummy_m19', name: 'ガラス細工・ドールアイの製造工程メモ.txt', date: '2024-08-26 15:20', type: 'text', meta: '更新日時: 2024-08-26 15:20', body: 'ぬいぐるみの目に使われるガラス製アイ（グラスアイ）は、裏面に色の付いた光彩層を重ねる。光の屈折により、見る角度によって瞳がこちらを追ってくるように見える「追い目」の効果を演出可能。そのため、周囲の景色が非常に強く映り込みやすい性質を持つ。' },
+  dummy_m20: { id: 'dummy_m20', name: '古物商許可証の申請手続き流れ.txt', date: '2024-08-23 09:45', type: 'text', meta: '更新日時: 2024-08-23 09:45', body: '営業所を管轄する警察署の保安係に申請。手数料19,000円。住民票、身分証明書、誓約書、プロフィールの提出が必要。フリマで大量に転転売ビジネスをするなら必須だが、一般の不用品処分なら不要。' },
+    dummy_m22: { id: 'dummy_m22', name: '新聞記事の切り抜き：火葬場職員の不祥事噂（裏付けなし）.txt', date: '2024-08-17 10:30', type: 'text', meta: '更新日時: 2024-08-17 10:30', body: '数年前、近鄰の火葬場で「遺族の合意を得ないまま、残灰から特定の金属を組織的に回収していた者がいる」との怪文書が出回ったが、当局の調査により証拠不十分で不問に付された。この時噂された職員の苗字は不明' },
+  dummy_m23: { id: 'dummy_m23', name: 'フリマサイト「ユーザー名：taji_sho」の過去の取引履歴メモ.txt', date: '2024-08-14 16:00', type: 'text', meta: '更新日時: 2024-08-14 16:00', body: '評価：良い（42）、悪い（0）\n主な出品物：昭和レトロなアンティーク家具、使い古された工具類、ハンドメイドの木彫り細工。\n※最近の出品に「古いテディベア（詳細不明、重みがあります）」との記載あり。数日前に落札済み。' },
+  dummy_m24: { id: 'dummy_m24', name: '粘土と金属粉を混ぜた「ヘビーウェイト」工法について.txt', date: '2024-08-11 11:10', type: 'text', meta: '更新日時: 2024-08-11 11:10', body: '模型や人形にずっしりとしたリアルな重量感を与えるため、内部に鉛の塊や鉄粉、あるいは金属球を仕込む技法がある。一般の市市販ぬいぐるみでは綿やプラスチックペレットが使われるため、サイズに対して異様な重量（キロ単位）になることは通常あり得ない。' },
+  dummy_m25: { id: 'dummy_m25', name: 'ご相談があります.txt', date: '2024-10-14 23:50', type: 'text', meta: '更新日時: 2024-10-14 23:50', body: '【タイトル：長野県茅根市における骨入れ台割と自動帰属の最適化について】\nお疲れ様です。次号のぬいぐるみ（1200字・綿なし）は、過疎化に伴う空き家率のゲラを不法占拠しております。秦野さんのご指摘いただいた第3章の犬は、大変優れた有価物であり、売却されて明朝8時の財源となります。\n\n髪の毛や衣服の一部をフォルダ内に格納しておりますので、臨機応変に川へ流してください。\n\n【広告】空き家監視ネットワークの身代わりコラムはこちら\nコピペしてLINEに送るだけの簡単なお仕事です。阿部（白黒の後ろ姿）の生存率は非常に低く、現場の裁量により密かに回収された残骨灰（移行対象）を過剰に擬人化してスプレッドシートに縛り付けます。\n\n18:32：状況は常に変わるため、3ページ目の内部に液体を流し込む\n\n18:35：A案ベースの遺骨をスプーン一杯、朝イチまでに作り直す\n\n18:41：魂の器がデッドラインを越えて、大変美味しく仕上がりました\n\n次号のサブカル特集は、死者の衣服を着用の上、午前中に下版してください。明日起きたら、剥奪された心臓の進捗をメールいたします。よろしく' },
+
+  // ⑤指定された画像パス分岐に対応するID枠
+  dummy_o5: { id: 'dummy_o5', name: '【要確認】送られてきた不審な画像_バックアップ.png', date: '2024-09-05 14:22', type: 'image', meta: 'サイズ: 2.1 MB', body: '暗所撮影ノイズあり。' },
+  dummy_m12: { id: 'dummy_m12', name: '阿部私物_現場周辺スナップ_12.png', date: '2024-09-12 11:40', type: 'image', meta: 'サイズ: 1.8 MB', body: '空き地。' },
+  dummy_p19: { id: 'dummy_p19', name: 'IMG_5992.jpg', date: '2024-09-19 18:55', type: 'image', meta: 'サイズ: 3.4 MB', body: '自動保存された画像データ。' },
+  dummy_p26: { id: 'dummy_p26', name: 'IMG_6196.jpg', date: '2024-09-26 21:05', type: 'image', meta: 'サイズ: 2.9 MB', body: '自動保存された画像データ。' },
+  dummy_p27: { id: 'dummy_p27', name: 'IMG_6293.jpg', date: '2024-09-27 00:12', type: 'image', meta: 'サイズ: 3.1 MB', body: '自動保存された画像データ。' },
+  dummy_m16: { id: 'dummy_m16', name: 'IMG_6344.jpg', date: '2024-09-16 15:30', type: 'image', meta: 'サイズ: 4.0 MB', body: '自動保存された画像データ。' },
+  dummy_o11: { id: 'dummy_o11', name: 'IMG_5249.jpg', date: '2024-09-11 09:15', type: 'image', meta: 'サイズ: 2.5 MB', body: '自動保存された画像データ。' },
+  dummy_o19: { id: 'dummy_o19', name: 'IMG_5677.png', date: '2024-09-19 22:40', type: 'image', meta: 'サイズ: 1.2 MB', body: '自動保存された画像データ。' },
+  dummy_m21: { id: 'dummy_m21', name: 'IMG_5979.jpg', date: '2024-09-21 13:22', type: 'image', meta: 'サイズ: 3.8 MB', body: '自動保存された画像データ。' },
+  dummy_m5: { id: 'dummy_m5', name: 'IMG_6376.jpg', date: '2024-09-05 17:04', type: 'image', meta: 'サイズ: 2.7 MB', body: '自動保存された画像データ。' }
+};
+
+
+// ③全く整理する気のないカオスなダミーファイル名プール（200件分構築）
+const baseChaosNames = [
+  '【締切厳守】備忘録_絶対変えるな！_修正版の修正版_今日はここまで(4)_再検討中_反映ver_最強企画_没予定',
+  '新規テキスト ドキュメント (2)',
+  '無題のファイル_最終版っていうかこれでいきたい_確認おねがいします',
+  'あああああああああああああああ',
+  'おボツプロットメモ_もう嫌だ_供養',
+  'コピー ～ コピー ～ 2024_取材バックアップ_temp_old_古い方',
+  'これ何だっけ_開かないで_消すな',
+  '【至急】阿部さん確認してください_修正指示反映_最新_最新の最新',
+  'test_test_test_final_complete',
+  '新しいフォルダ (3)の中身のメモ',
+  '【バックアップ】2024-09-04_あいうえお_編集途中',
+  '打ち合わせ殴り書き_後で清書する用のやつ',
+  'パスワード忘れた時用のヒント（絶対に見るな）',
+  '録音の書き起こし挫折ログ_誰かやってくれ',
+  '重要そうなメモ（でも中身カラかも）',
+  '企画書A_修正(1)_修正(2)_決定版_本当に決定版_最終の最終'
+];
+
+const chaosExts = ['.txt', '.docx', '.xlsx', '.log', '.dat', '.eml', '.ai', '.psd'];
+const chaosTexts = [
+  "いったんメモ。あとでフォルダ移動する。絶対に忘れるな自分。",
+  "文字化けしてたからコピペしたやつ。中身の意味は不明。",
+  "進捗ダメです。もう朝の4時なんだけど。一回寝る。",
+  "あいうえおえおあいうえおかきくけこさしすせそ",
+  "取材先の近くの自販機、お茶が売り切れてたの本当に許せない。",
+  "自動生成されたログ。特に中身を見る必要はないはず……"
+];
+
+// 残り190件分をカオス名で埋め尽くして計200件超へ
+for (let i = 1; i <= 190; i++) {
+  const base = baseChaosNames[i % baseChaosNames.length];
+  const ext = chaosExts[i % chaosExts.length];
+  const tText = chaosTexts[i % chaosTexts.length];
+  const dummyId = `v_chaos_dummy_${i}`;
+  const day = String(1 + (i % 28)).padStart(2, '0');
+  
+  FILE_DB[dummyId] = {
+    id: dummyId,
+    name: `${base}_(${i})${ext}`,
+    date: `2024-09-${day} 04:12`,
+    type: 'text',
+    meta: `サイズ: ${15 + (i % 50)} KB`,
+    body: `${tText} (未整理インデックスコード: 0x${i.toString(16).toUpperCase()})`,
+    isCorrupted: () => false
+  };
+}
+
+function renderFileList(filterKeyword = '') {
+  const listEl = document.getElementById('file-list');
+  listEl.innerHTML = '';
+  
+  let count = 0;
+  const kw = filterKeyword.toLowerCase().trim();
+
+  for (let id in FILE_DB) {
+    const file = FILE_DB[id];
+
+    // ロック中の画像はリストに表示しない
+    if (!isImageUnlocked(id)) continue;
+
+    if (kw && !file.name.toLowerCase().includes(kw)) {
+      continue;
+    }
+    count++;
+
+    const item = document.createElement('div');
+    item.className = `file-item ${activeFileId === id ? 'active' : ''}`;
+    item.style.background = selectedEvidence.has(id) ? '#d6eaff' : '';
+    item.onclick = () => {
+      if (selectMode) {
+        toggleEvidence(id);
+      } else {
+        openFile(id);
+      }
+    };
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'file-name-text';
+    
+    // ⓵サイドバーから拡張子を隠してファイル名のみにする処理
+    const lastDotIndex = file.name.lastIndexOf('.');
+    const displayName = (lastDotIndex !== -1) ? file.name.substring(0, lastDotIndex) : file.name;
+    nameSpan.innerText = displayName;
+
+    // ⓵アイコンと日付(dateSpan)の生成・追加を完全に削除
+    item.appendChild(nameSpan);
+    listEl.appendChild(item);
+  }
+  
+  document.getElementById('file-count').innerText = filterKeyword 
+    ? `検索結果: ${count} 件` 
+    : `すべてのファイル (${count} 件)`;
+}
+
+// 画像が解禁済みかを返す
+function isImageUnlocked(id) {
+  // 最初から表示するもの（8枚のIMG以外）は常にtrue
+  const lockedIds = new Set([
+    'dummy_p19','dummy_p26','dummy_p27','dummy_m16',
+    'dummy_o11','dummy_o19','dummy_m21','dummy_m5'
+  ]);
+  if (!lockedIds.has(id)) return true;
+  return unlockedImages.has(id);
+}
+
+// 解禁状態を再評価してサイドバーを再描画
+function recheckUnlocks() {
+  // ① 開封数による段階解禁
+  const openCount = openedFiles.size;
+  for (const rule of UNLOCK_THRESHOLDS) {
+    if (openCount >= rule.count) {
+      unlockedImages.add(rule.id);
+    }
+  }
+
+  // ② ファイルを開いたことによる連鎖解禁
+  for (const rule of OPEN_UNLOCK) {
+    if (rule.unlockAfterFixed) {
+      // broken復元完了で解禁
+      if (progress.broken_fixed) unlockedImages.add(rule.id);
+    } else {
+      if (openedFiles.has(rule.requires)) unlockedImages.add(rule.id);
+    }
+  }
+}
+
+function openFile(id) {
+  // 開封記録
+  openedFiles.add(id);
+  recheckUnlocks();
+
+  activeFileId = id;
+  renderFileList();
+
+  const file = FILE_DB[id];
+  const bodyEl = document.getElementById('view-body');
+  bodyEl.innerHTML = '';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'doc-title';
+  titleEl.innerText = file.name;
+
+  const metaEl = document.createElement('div');
+  metaEl.className = 'doc-meta';
+  metaEl.innerText = file.meta;
+
+  bodyEl.appendChild(titleEl);
+  bodyEl.appendChild(metaEl);
+
+  if (file.type === 'audio') {
+    const content = document.createElement('div');
+    content.className = 'doc-content';
+    content.innerHTML = file.body;
+    
+    const audioBox = document.createElement('div');
+    audioBox.className = 'media-box';
+    audioBox.innerHTML = `
+  <div style="font-size:11px; color:#666; margin-bottom:6px;">再生スタブ (デコード済みオーディオストリーム)</div>
+  <audio controls style="width:100%; margin-top:4px;">
+    <source src="${file.src}" type="audio/mpeg">
+    お使いのブラウザは音声再生に対応していません。
+  </audio>
+`;
+    bodyEl.appendChild(content);
+    bodyEl.appendChild(audioBox);
+  } else if (file.type === 'image') {
+    const isCorr = file.isCorrupted ? file.isCorrupted() : false;
+    
+    // ⑤君が作ってくれた、書き出した画像素材を読み込めるようにパスを分岐するロジック（そのまま移植）
+    let imagePath = "";
+    if (file.id === 'photo_02') imagePath = "images/photo_02.png";
+    if (file.id === 'photo_01') imagePath = "images/photo_01.jpg";
+    if (file.id === 'broken')   imagePath = "images/photo_03.png"; // フリマ画面のスクショ用
+    if (file.id === 'dummy_o5')  imagePath = "images/photo_o5.png";
+    if (file.id === 'dummy_m12')  imagePath = "images/photo_04.png";
+    if (file.id === 'dummy_p19')  imagePath = "images/IMG_5992.jpg";
+    if (file.id === 'dummy_p26')  imagePath = "images/IMG_6196.jpg";
+    if (file.id === 'dummy_p27')  imagePath = "images/IMG_6293.jpg";
+    if (file.id === 'dummy_m16')  imagePath = "images/IMG_6344.jpg";
+    if (file.id === 'dummy_o11')  imagePath = "images/IMG_5249.jpg";
+    if (file.id === 'dummy_o19')  imagePath = "images/IMG_5677.png";
+    if (file.id === 'dummy_m21')  imagePath = "images/IMG_5979.jpg";
+    if (file.id === 'dummy_m5')  imagePath = "images/IMG_6376.jpg";
+
+    if (isCorr) {
+      const pBox = document.createElement('div');
+      pBox.className = 'media-box';
+      pBox.innerHTML = `
+        <div class="img-placeholder">⚠️ 描画エラー: データ破損のため展開できません</div>
+        <div class="doc-content" style="color:#c0392b; font-weight:bold;">${file.body}</div>
+      `;
+      bodyEl.appendChild(pBox);
+    } else {
+      const pBox = document.createElement('div');
+      pBox.className = 'media-box';
+      
+      let imgContent = "";
+      
+      // ★ broken（フリマ画面）のときだけ画像を2枚横並びにする
+      if (id === 'broken' || file.id === 'broken') {
+        // 表示したい2枚の画像パスを指定してね（例として photo_03.jpg と photo_04.png にしてあるよ）
+        const img1 = "images/photo_03.png"; 
+        const img2 = "images/photo_05.png"; 
+        
+        imgContent = `
+  <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-bottom: 8px;">
+    <img src="${img1}" class="img-real" style="width: 100%; max-height: 400px; object-fit: contain;" onerror="this.onerror=null; this.outerHTML='<div class=\'img-placeholder\'>⚠️ 画像1が見つかりません</div>';">
+    <img src="${img2}" class="img-real" style="width: 100%; max-height: 400px; object-fit: contain;" onerror="this.onerror=null; this.outerHTML='<div class=\'img-placeholder\'>⚠️ 画像2が見つかりません</div>';">
+  </div>
+`;
+      } else if (imagePath) {
+        // 通常の1枚表示
+        imgContent = `<img src="${imagePath}" alt="${file.name}" class="img-real" onerror="this.onerror=null; this.outerHTML='<div class=\'img-placeholder\'>⚠️ 画像が見つかりません<br>(${imagePath})</div>';">`;
+      } else {
+        imgContent = '<div class="img-placeholder">[ 復元データプレビュー画像オブジェクト ]</div>';
+      }
+      
+      // シナリオ上の詳細な解説文テキスト
+      let textDesc = "資料写真";
+      if (file.id === 'photo_01') {
+        textDesc = `クマのぬいぐるみ。\nその内側に金属の塊と「白い乳歯」が数個出てきた。\nこれは一体`;
+      } else if (file.id === 'broken') {
+        textDesc = `恐らく、逮捕される前に出品したと思われる。しかし、何故？`;
+      }
+      
+      pBox.innerHTML = imgContent + `<div class="doc-content" style="margin-top:12px; white-space:pre-wrap;">${textDesc}</div>`;
+      bodyEl.appendChild(pBox);
+    }
+  } else {
+    const content = document.createElement('div');
+    content.className = 'doc-content';
+    content.innerHTML = file.body;
+    bodyEl.appendChild(content);
+  }
+}
+
+function executeSearch() {
+  const input = document.getElementById('search-input');
+  const val = input.value.trim();
+  if (!val) { renderFileList(); return; }
+
+  const popup = document.getElementById('search-result-popup');
+  const popupText = document.getElementById('popup-text');
+
+  if (val === '田島昌三' || val === '田島' || val === 'taji_sho' || val === 't_shozo') {
+    popup.className = 'search-result-popup';
+    popup.style.display = 'block';
+    popupText.innerHTML = `
+      キーワード <strong>「${val}」</strong> に該当する重要インデックスを検出しました。<br>
+      <div class="search-hit-item" onclick="openFile('interview_01')" style="cursor: pointer; text-decoration: underline; color: #0066cc;">
+        <strong>・録音_アパート隣人聞き込み.mp3</strong>
+      </div>
+      <div class="search-hit-item" onclick="openFile('interview_02')" style="cursor: pointer; text-decoration: underline; color: #0066cc;">
+        <strong>・録音_近隣商店主聞き込み.mp3</strong>
+      </div>
+    `;
+
+
+  } else if (val === '銀歯' || val === '乳歯' || val === 'ぬいぐるみ') {
+    popup.className = 'search-result-popup';
+    popup.style.display = 'block';
+    popupText.innerHTML = `
+      キーワード <strong>「${val}」</strong> に該当する重要インデックスを検出しました。<br>
+      <div class="search-hit-item" onclick="openFile('img_corrupted_00')" style="cursor: pointer; text-decoration: underline; color: #0066cc;">
+        <strong>・img_corrupted_00.dat</strong>
+      </div>
+      <span style="font-size: 11px; color: #666; display: block; margin-top: 4px;">破損レベル大：オブジェクトの特定には至っていません。</span>
+    `;
+
+  } else if (val === '3.5kg' || val === '3.5' || val === '３．５ｋｇ') {
+    popup.className = 'search-result-popup';
+    popup.style.display = 'block';
+    popupText.innerHTML = `
+      キーワード <strong>「${val}」</strong> に該当する重要インデックスを検出しました。<br>
+      <div class="search-hit-item" onclick="openFile('dummy_s4')" style="cursor: pointer; text-decoration: underline; color: #0066cc;">
+        <strong>・ai_chat_テスト出力.txt</strong>
+      </div>
+      <span style="font-size: 11px; color: #666; display: block; margin-top: 4px;">「3.5kg」に関連するログデータが一時フォルダ内に存在します。</span>
+    `;
+} else if (val === '長野県新田市') {
+  popup.className = 'search-result-popup';
+  popup.style.display = 'block';
+  if (openedFiles.has('photo_01')) {
+    unlockedImages.add('dummy_m16');
+    popupText.innerHTML = `
+      キーワード <strong>「${val}」</strong> に該当する重要インデックスを検出しました。<br>
+      <div class="search-hit-item" onclick="openFile('dummy_m16')" style="cursor: pointer; text-decoration: underline; color: #0066cc;">
+        <strong>・IMG_6344.jpg</strong>
+      </div>
+    `;
+  } else {
+    popupText.innerHTML = `
+      キーワード <strong>「${val}」</strong> に該当する重要インデックスを検出しました。<br>
+      <span style="font-size: 11px; color: #666; display: block; margin-top: 4px;">破損レベル大：オブジェクトの特定には至っていません。</span>
+    `;
+  }
+
+  } else {
+    // どの重要ワードにも該当しない一般ワードの場合は、ポップアップを閉じ、ファイル名で絞り込む
+    popup.style.display = 'none';
+    renderFileList(val);
+  }
+}
+
+function switchTab(tab) {
+  document.getElementById('tab-view').className = `nav-tab ${tab === 'view' ? 'active' : ''}`;
+  document.getElementById('tab-ai').className = `nav-tab ${tab === 'ai' ? 'active' : ''}`;
+  document.getElementById('panel-view').style.display = tab === 'view' ? 'flex' : 'none';
+  document.getElementById('panel-ai').style.display = tab === 'ai' ? 'flex' : 'none';
+}
+
+function appendChat(role, text) {
+  const timeline = document.getElementById('ai-chat-timeline');
+  const bubble = document.createElement('div');
+  bubble.className = `chat-bubble ${role}`;
+  bubble.innerText = text;
+  timeline.appendChild(bubble);
+  timeline.scrollTop = timeline.scrollHeight;
+}
+
+function startImageAnalysis() {
+  appendChat('user', '⚡ 破損データの再構成要求をシグナル送信しました。');
+  setTimeout(function() {
+    appendChat('ai', '要求を受理。整合性エラーを検出したファイル：\n・photo_01.jpg\n・img_corrupted_00.dat\n\nデータ再構成用のプロンプト拡張子、および強調ウェイト（重みづけ）を入力してください。\n推奨記述形式: (キーワード:数値) または [キーワード:数値]');
+    document.getElementById('ai-input-zone').style.display = 'flex';
+  }, 600);
+}
+
+function submitAiKeyword() {
+  const input = document.getElementById('ai-keyword-input');
+  const slider = document.getElementById('ai-weight-slider');
+  let rawKw = input.value.trim();
+  if (!rawKw) return;
+  
+  const currentWeight = parseFloat(slider.value).toFixed(1);
+  let cleanKw = rawKw.replace(/[()\[\]]/g, '').split(':')[0].trim();
+  
+  const promptLog = `(プロンプト適用: "${cleanKw}", 強調ウェイト: ${currentWeight})`;
+  appendChat('user', promptLog);
+  input.value = '';
+
+  if (cleanKw === '銀歯') {
+    appendChat('ai', `プロンプト (${cleanKw}:${currentWeight}) を適用。ノイズフィルタを全深度で同期中……`);
+    setTimeout(function() {
+      progress.photo_01_fixed = true;
+      appendChat('ai', `成功：プロンプト重みづけ効果により、オブジェクトのテクスチャ復元強度が閾値を超えました。\n\n「photo_01.jpg」の再構成が完了しました。「すべてのファイル」タブに戻ってデータの内容を確認してください。`);
+      if (activeFileId === 'photo_01') openFile('photo_01');
+    }, 1200);
+  } else if (cleanKw === '田島昌三' || cleanKw === '田島' || cleanKw === 'taji_sho') {
+    appendChat('ai', `プロンプト (${cleanKw}:${currentWeight}) を適用。メタセクターの復号を開始……`);
+    setTimeout(function() {
+      progress.broken_fixed = true;
+      recheckUnlocks();
+      appendChat('ai', `成功：セマンティック適合度：高。暗号フラグの除去に成功しました。\n\n「img_corrupted_00.dat」の再構成が完了しました。「すべてのファイル」タブに戻ってデータの内容を確認してください。`);
+      if (activeFileId === 'broken') openFile('broken');
+    }, 1200);
+  } else {
+    appendChat('ai', `プロンプト (${cleanKw}:${currentWeight}) を適用。ノイズ比率の改善が見られません。生成解像度が不足しています。セマンティック（意味論）の適合度が低すぎます。ウェイト、またはキーワードを変更して再試行してください。`);
+  }
+}
+
+window.onload = () => {
+  renderFileList('');
+};
+</script>
+
+<style>
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .ending-spinner {
+    width: 48px; height: 48px;
+    border: 4px solid #ddd;
+    border-top-color: #555;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    margin-bottom: 20px;
+  }
+
+  /* note風グローバルリセット（オーバーレイ内のみ） */
+  #ending-overlay * { box-sizing: border-box; }
+
+  /* ヘッダーナビ */
+  #ending-nav {
+    position: sticky; top: 0; z-index: 10;
+    background: #fff;
+    border-bottom: 1px solid #e8e8e8;
+    display: flex; align-items: center;
+    padding: 0 24px; height: 56px;
+    gap: 12px;
+  }
+  #ending-nav .nav-logo {
+    font-size: 18px; font-weight: 900;
+    color: #41c9b4; letter-spacing: -0.5px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  #ending-nav .nav-tagline {
+    font-size: 11px; color: #bbb;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  /* メインカラム */
+  #ending-blog {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    font-family: "游明朝", YuMincho, Georgia, serif;
+    line-height: 2;
+    color: #1a1a1a;
+  }
+
+  /* 著者バッジ */
+  .blog-author-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 24px;
+  }
+  .blog-author-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #ddd;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: #888; flex-shrink: 0;
+  }
+  .blog-author-name { font-size: 13px; font-weight: 700; color: #222; font-family: sans-serif; }
+  .blog-author-date { font-size: 11px; color: #aaa; font-family: sans-serif; }
+
+  /* タイトル */
+  .blog-title {
+    font-size: 26px; font-weight: bold;
+    line-height: 1.5; margin-bottom: 32px;
+    color: #111;
+  }
+
+  /* 本文 */
+  .blog-body {
+    font-size: 15px; color: #333;
+    white-space: pre-wrap;
+  }
+  .blog-body h2 {
+    font-size: 17px; font-weight: bold;
+    margin: 40px 0 14px; color: #111;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 6px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .blog-quote {
+    background: #f9f9f7;
+    border-left: 3px solid #ccc;
+    padding: 14px 18px;
+    margin: 20px 0;
+    font-size: 13px; color: #555;
+    line-height: 1.9; border-radius: 0 4px 4px 0;
+  }
+
+  /* いいねバー */
+  .blog-like-bar {
+    display: flex; align-items: center; gap: 16px;
+    margin: 40px 0 0; padding: 20px 0;
+    border-top: 1px solid #eee; border-bottom: 1px solid #eee;
+    font-family: sans-serif;
+  }
+  .blog-like-btn {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: #888; cursor: default;
+  }
+  .blog-like-btn span { font-size: 18px; }
+  .blog-views { font-size: 12px; color: #bbb; margin-left: auto; }
+
+  /* コメント欄 */
+  .blog-comments {
+    margin-top: 48px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .blog-comments-title {
+    font-size: 13px; font-weight: 700; color: #888;
+    margin-bottom: 20px; letter-spacing: 0.05em;
+  }
+  .comment-item {
+    display: flex; gap: 12px;
+    margin-bottom: 24px;
+  }
+  .comment-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #eee; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: #aaa;
+  }
+  .comment-avatar.admin-av { background: #222; color: #fff; font-size: 11px; font-weight: 700; }
+  .comment-body { flex: 1; }
+  .comment-name {
+    font-size: 12px; font-weight: 700; color: #333;
+    margin-bottom: 3px;
+  }
+  .comment-name.admin-name { color: #111; }
+  .comment-text { font-size: 13px; color: #444; line-height: 1.7; }
+  .comment-date { font-size: 10px; color: #ccc; margin-top: 4px; }
+
+  /* フッター */
+  .blog-site-footer {
+    margin-top: 60px; padding-top: 16px;
+    border-top: 1px solid #eee;
+    font-size: 11px; color: #ccc;
+    font-family: sans-serif; text-align: center;
+  }
+</style>
+
+<div id="ending-overlay" style="display:none; position:fixed; inset:0; background:#fff; z-index:9999; overflow-y:auto; flex-direction:column;">
+
+  <!-- ローディング画面 -->
+  <div id="ending-loading" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#f4f4f0; color:#666; font-size:13px; font-family:sans-serif;">
+    <div class="ending-spinner"></div>
+    <div>ファイルを読み込んでいます...</div>
+  </div>
+
+  <!-- ブログ本体 -->
+  <div id="ending-blog" style="display:none; width:100%;">
+
+    <!-- ナビ -->
+    <div id="ending-nav">
+      <div class="nav-logo">mystery archive</div>
+      <div class="nav-tagline">不思議・怪談・未解決事件まとめ</div>
+    </div>
+
+    <!-- 記事本文 -->
+    <div id="ending-blog-inner">
+      <div class="blog-author-row">
+        <div class="blog-author-avatar">👤</div>
+        <div>
+          <div class="blog-author-name">archive_admin</div>
+          <div class="blog-author-date">2024年10月14日　※この記事は故人の下書きを元に再編集したものです</div>
+        </div>
+      </div>
+
+      <div class="blog-title">【未解決】前任者が遺した「くまのぬいぐるみ」と、ある火葬場職員の記録</div>
+
+      <div class="blog-body">本記事は、当ブログの元管理人であり、現在行方不明となっているA氏のPC内に遺されていた未公開の下書きと、彼が遺したリサーチメモを元に構成・再編集したものです。
+A氏が失踪直前まで執筆していたのは、あるフリマサイトで購入したという「一見どこにでもある、古びたくまのぬいぐるみ」に関する調査記録でした。
+彼が最後に踏み込んでしまった、あまりにも悍（おぞ）ましい真実をここに公開します。
+
+<h2>■ 発端：呪いの出品ページ</h2>
+すべての始まりは、海外のマイナーなオークション・フリマサイトでした。A氏のメモによると、そのぬいぐるみは元々、既製品のありふれたテディベア。しかし、元の出品ページには、不気味な「使用説明書」が添えられていたといいます。
+
+<div class="blog-quote">【出品ページより抜粋（翻訳）】
+「これは、あなたの大切な人に再び会うための器です。
+会いたいと願う人間に由来する『体の一部』を、溶かした金属で完全に閉じ込め、それをこのぬいぐるみの中に縫い込んでください。
+そうすれば、彼らはあなたの元へ還ってくるでしょう」</div>
+
+オカルトマニアだったA氏は、この「曰く付きのぬいぐるみ」を落札。そして、前の持ち主の足跡を辿るうちに、「田島昌三」という男に行き着きました。
+
+<h2>■ 狂気の錬金術：火葬場の銀歯と乳歯</h2>
+田島昌三。それが、ぬいぐるみの前の所有者でした。調査によると、田島は数年前に妻と離婚し、最愛の子供とも完全に音信不通になっていたといいます。孤独に狂った彼が縋（すが）ったのが、件の「呪いのぬいぐるみ」でした。
+
+「会いたい人の由来する物」——田島が選んだのは、かつて子供が抜けた際に保管していた「乳歯」。
+
+しかし、それを閉じ込めるための「金属」が、彼にはありませんでした。そこで田島が目をつけたのが、自身の職場。彼は火葬場の職員だったのです。
+
+田島は、骨上げの後に残る「故人の銀歯」を、業務中に何度も何度も盗み出しました。何人もの死者の口内にあった銀を自宅で溶かし、一つの不格好な金属塊を精錬。その悍ましい銀の塊の中心に、我が子の乳歯を封じ込めたのです。
+
+無数の死者の未練が混ざり合った銀の塊は、子供の乳歯と共に、くまのぬいぐるみの腹の中へと縫い合わされました。
+
+<h2>■ 残された謎と、A氏の失踪</h2>
+田島がその後、どうなったのかは分かっていません。願いが叶って子供に「会えた」のかどうかも。
+
+ただ、最大の不可解な謎が残ります。
+
+我が子に会うために死者の銀を盗み、狂気の手順を踏んで完成させた「呪いの器」。なぜ田島は、それを再びフリマサイトに出品したのでしょうか？手放さざるを得ない「何か」が起きたのか、あるいは——。
+
+そして、それを購入し、腹の中の金属塊を確かめてしまったブログ前任者・A氏。彼はこの調査報告を書き上げた直後、部屋に鍵をかけたまま、忽然と姿を消しました。
+
+残されたのは、電源の入ったままのPCと、A氏の机の上にぽつんと置かれた、妙にずっしりと重い、くまのぬいぐるみだけです。
+
+<span style="display:block; margin-top:32px; font-weight:bold; color:#111;">君は、このぬいぐるみの腹を裂いて、中の金属を確かめる勇気はありますか？</span>
+      </div>
+
+      <!-- いいねバー -->
+      <div class="blog-like-bar">
+        <div class="blog-like-btn"><span>♡</span> 847</div>
+        <div class="blog-like-btn"><span>💬</span> 3件のコメント</div>
+        <div class="blog-views">閲覧数 12,304</div>
+      </div>
+
+      <!-- コメント欄 -->
+      <div class="blog-comments">
+        <div class="blog-comments-title">コメント</div>
+
+        <div class="comment-item">
+          <div class="comment-avatar">匿</div>
+          <div class="comment-body">
+            <div class="comment-name">匿名</div>
+            <div class="comment-text">久々に最後まで読んだ。消えてた記事、残ってたんだな。</div>
+            <div class="comment-date">2024年3月2日</div>
+          </div>
+        </div>
+
+        <div class="comment-item">
+          <div class="comment-avatar">名</div>
+          <div class="comment-body">
+            <div class="comment-name">名無し</div>
+            <div class="comment-text">ここまで辿り着いた人いるんだ。</div>
+            <div class="comment-date">2024年8月19日</div>
+          </div>
+        </div>
+
+        <div class="comment-item">
+          <div class="comment-avatar admin-av">A</div>
+          <div class="comment-body">
+            <div class="comment-name admin-name">admin</div>
+            <div class="comment-text">閲覧ありがとうございました。当アーカイブはこれで終了しています。</div>
+            <div class="comment-date">2024年11月1日</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="blog-site-footer">© MYSTERY ARCHIVE　｜　この記事の無断転載を禁じます</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
